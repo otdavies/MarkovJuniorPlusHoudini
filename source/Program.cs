@@ -27,12 +27,16 @@ static class Program
         Dictionary<char, int> palette = CommandLine.Pallete(args);
         XDocument models = CommandLine.Document(args);
 
-        ExecuteSingle("Test2", models, palette, 20);
+        int size = args.Length < 3 ? 100 : Int32.Parse(args[2]);
+        int dimensions = args.Length < 4 ? 2 : Int32.Parse(args[3]);
+        int steps = args.Length < 5 ? 1000 : Int32.Parse(args[4]);
+
+        ExecuteSingle("Test2", models, palette, size, dimensions, steps);
         
         Console.WriteLine($"time = {sw.ElapsedMilliseconds}");
     }
 
-    private static void ExecuteSingle(string name, XDocument model, Dictionary<char, int> pallete, int linearSize, int customSeed=0, int steps=2000, int dimension=3, int amount=3, int pixelsize=4) {
+    private static void ExecuteSingle(string name, XDocument model, Dictionary<char, int> pallete, int linearSize, int dimension=3, int steps=2000, int customSeed=0, int amount=4, bool gif=false, int pixelsize=4) {
         Random random = new();
         int MX = linearSize;
         int MY = linearSize;
@@ -49,14 +53,25 @@ static class Program
         {
             int seed = customSeed;
             if (seed == 0) seed = random.Next();
-            foreach ((byte[] result, char[] legend, int FX, int FY, int FZ) in interpreter.Run(seed, steps, false))
+            if (gif) System.IO.Directory.CreateDirectory("output/gif/");
+
+            foreach ((byte[] result, char[] legend, int FX, int FY, int FZ) in interpreter.Run(seed, steps, gif))
             {
                 int[] colors = legend.Select(ch => pallete[ch]).ToArray();
-                string outputname = $"output/{name}_{seed}";
-                var (bitmap, WIDTH, HEIGHT) = Graphics.Render(result, FX, FY, FZ, colors, pixelsize, 0);
-                // GUI.Draw(name, interpreter.root, interpreter.current, bitmap, WIDTH, HEIGHT, pallete);
-                Graphics.SaveBitmap(bitmap, WIDTH, HEIGHT, outputname + ".png");
-                VoxHelper.SaveVox(result, (byte)FX, (byte)FY, (byte)FZ, colors, outputname + ".vox");
+                if (gif)
+                {
+                    string outputname = $"output/gif/{interpreter.counter}";
+                    var (bitmap, WIDTH, HEIGHT) = Graphics.Render(result, FX, FY, FZ, colors, pixelsize, 0);
+                    Graphics.SaveBitmap(bitmap, WIDTH, HEIGHT, outputname + ".png");
+                }
+                else
+                {
+                    var (bitmap, WIDTH, HEIGHT) = Graphics.Render(result, FX, FY, FZ, colors, pixelsize, 0);
+                    string outputname = $"output/{name}_{seed}";
+                    Graphics.SaveBitmap(bitmap, WIDTH, HEIGHT, outputname + ".png");
+                    VoxHelper.SaveVox(result, (byte)FX, (byte)FY, (byte)FZ, colors, outputname + ".vox");
+                    //GUI.Draw(name, interpreter.root, interpreter.current, bitmap, WIDTH, HEIGHT, pallete);
+                }
             }
             Console.WriteLine("DONE");
         }
