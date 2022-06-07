@@ -1,24 +1,70 @@
 ﻿// Copyright (C) 2022 Maxim Gumin, The MIT License (MIT)
+// Modified by Oliver Davies
 
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Xml.Linq;
-using System.Diagnostics;
-using System.Collections.Generic;
 
 static class Program
 {
-    static void Main()
+    // CLI usage example: 
+    // dotnet run source/models.xml source/resources/palette.xml
+    static void Main(string[] args)
     {
+        // Initialize modules we leverage
         Stopwatch sw = Stopwatch.StartNew();
-        var folder = System.IO.Directory.CreateDirectory("output");
-        foreach (var file in folder.GetFiles()) file.Delete();
 
-        Dictionary<char, int> palette = XDocument.Load("resources/palette.xml").Root.Elements("color").ToDictionary(x => x.Get<char>("symbol"), x => Convert.ToInt32(x.Get<string>("value"), 16) + (255 << 24));
+        CreateOutputDirectory("output");
 
-        Random meta = new();
-        XDocument xdoc = XDocument.Load("models.xml", LoadOptions.SetLineInfo);
-        foreach (XElement xmodel in xdoc.Root.Elements("model"))
+        foreach (var arg in args)
+        {
+            Console.WriteLine($"Argument: {arg}");
+        }
+
+        // Load our pallete and document
+        Dictionary<char, int> palette = CommandLine.Pallete(args);
+        XDocument models = CommandLine.Document(args);
+
+        ExecuteSingle("Test2", models, palette, 20);
+        
+        Console.WriteLine($"time = {sw.ElapsedMilliseconds}");
+    }
+
+    private static void ExecuteSingle(string name, XDocument model, Dictionary<char, int> pallete, int linearSize, int customSeed=0, int steps=2000, int dimension=3, int amount=3, int pixelsize=4) {
+        Random random = new();
+        int MX = linearSize;
+        int MY = linearSize;
+        int MZ = dimension == 2 ? 1 : linearSize;
+
+        Interpreter interpreter = Interpreter.Load(model.Root, MX, MY, MZ);
+        if (interpreter == null)
+        {
+            Console.WriteLine("Interpreter errored!");
+            return;
+        }
+        Console.Write($"{name} > ");
+        for (int k = 0; k < amount; k++)
+        {
+            int seed = customSeed;
+            if (seed == 0) seed = random.Next();
+            foreach ((byte[] result, char[] legend, int FX, int FY, int FZ) in interpreter.Run(seed, steps, false))
+            {
+                int[] colors = legend.Select(ch => pallete[ch]).ToArray();
+                string outputname = $"output/{name}_{seed}";
+                var (bitmap, WIDTH, HEIGHT) = Graphics.Render(result, FX, FY, FZ, colors, pixelsize, 0);
+                // GUI.Draw(name, interpreter.root, interpreter.current, bitmap, WIDTH, HEIGHT, pallete);
+                Graphics.SaveBitmap(bitmap, WIDTH, HEIGHT, outputname + ".png");
+                VoxHelper.SaveVox(result, (byte)FX, (byte)FY, (byte)FZ, colors, outputname + ".vox");
+            }
+            Console.WriteLine("DONE");
+        }
+    }
+
+    private static void ExecuteMultiple(XDocument models, Dictionary<char, int> palette) {
+        Random random = new();
+        foreach (XElement xmodel in models.Root.Elements("model"))
         {
             string name = xmodel.Get<string>("name");
             int linearSize = xmodel.Get("size", -1);
@@ -56,7 +102,7 @@ static class Program
 
             for (int k = 0; k < amount; k++)
             {
-                int seed = seeds != null && k < seeds.Length ? seeds[k] : meta.Next();
+                int seed = seeds != null && k < seeds.Length ? seeds[k] : random.Next();
                 foreach ((byte[] result, char[] legend, int FX, int FY, int FZ) in interpreter.Run(seed, steps, gif))
                 {
                     int[] colors = legend.Select(ch => palette[ch]).ToArray();
@@ -72,6 +118,11 @@ static class Program
                 Console.WriteLine("DONE");
             }
         }
-        Console.WriteLine($"time = {sw.ElapsedMilliseconds}");
+    }
+
+    private static void CreateOutputDirectory(string name) 
+    {
+        var folder = System.IO.Directory.CreateDirectory(name);
+        foreach (var file in folder.GetFiles()) file.Delete();
     }
 }
