@@ -31,12 +31,12 @@ static class Program
         int dimensions = args.Length < 4 ? 2 : Int32.Parse(args[3]);
         int steps = args.Length < 5 ? 1000 : Int32.Parse(args[4]);
 
-        ExecuteSingle("Test2", models, palette, size, dimensions, steps);
+        ExecuteSingle("Test2", models, palette, size, dimensions, steps, 0, 1, true);
         
         Console.WriteLine($"time = {sw.ElapsedMilliseconds}");
     }
 
-    private static void ExecuteSingle(string name, XDocument model, Dictionary<char, int> pallete, int linearSize, int dimension=3, int steps=2000, int customSeed=0, int amount=4, bool gif=false, int pixelsize=4) {
+    private static void ExecuteSingle(string name, XDocument model, Dictionary<char, int> pallete, int linearSize, int dimension=3, int steps=2000, int customSeed=0, int amount=4, bool gif=false, int pixelsize=8) {
         Random random = new();
         int MX = linearSize;
         int MY = linearSize;
@@ -61,16 +61,17 @@ static class Program
                 if (gif)
                 {
                     string outputname = $"output/gif/{interpreter.counter}";
-                    var (bitmap, WIDTH, HEIGHT) = Graphics.Render(result, FX, FY, FZ, colors, pixelsize, 0);
+                    var (bitmap, WIDTH, HEIGHT) = Graphics.Render(result, FX, FY, FZ, colors, pixelsize, 250);
+                    GUI.Draw(name, interpreter.root, interpreter.current, bitmap, WIDTH, HEIGHT, pallete);
                     Graphics.SaveBitmap(bitmap, WIDTH, HEIGHT, outputname + ".png");
                 }
                 else
                 {
-                    var (bitmap, WIDTH, HEIGHT) = Graphics.Render(result, FX, FY, FZ, colors, pixelsize, 0);
+                    var (bitmap, WIDTH, HEIGHT) = Graphics.Render(result, FX, FY, FZ, colors, pixelsize, 120);
                     string outputname = $"output/{name}_{seed}";
+                    GUI.Draw(name, interpreter.root, interpreter.current, bitmap, WIDTH, HEIGHT, pallete);
                     Graphics.SaveBitmap(bitmap, WIDTH, HEIGHT, outputname + ".png");
                     VoxHelper.SaveVox(result, (byte)FX, (byte)FY, (byte)FZ, colors, outputname + ".vox");
-                    //GUI.Draw(name, interpreter.root, interpreter.current, bitmap, WIDTH, HEIGHT, pallete);
                 }
             }
             Console.WriteLine("DONE");
