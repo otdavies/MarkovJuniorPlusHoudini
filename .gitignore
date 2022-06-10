@@ -1,3 +1,10 @@
-/obj
-/output
-/bin
+.idea/
+.vscode/
+.vs/
+
+bin/
+obj/
+
+*.user
+
+output/
